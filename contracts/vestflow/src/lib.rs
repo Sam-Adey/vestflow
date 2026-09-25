@@ -4798,6 +4798,44 @@ fn resolve_nft_owner(
     }
 }
 
+// ---------------------------------------------------------------------------
+// Pure math helpers exposed for fuzz testing.
+//
+// These functions mirror the balance calculations in the contract entry points
+// but operate on plain integer inputs so the fuzzer does not need a Soroban
+// host environment.
+// ---------------------------------------------------------------------------
+
+/// Compute the amount a stream has accrued over `elapsed` seconds at
+/// `rate_per_sec`, capped by the funder's `balance`.
+///
+/// Mirrors the per-stream logic in `collectable_amount`:
+///   `rate.saturating_mul(elapsed).min(balance)`
+///
+/// Invariants verified by the fuzzer:
+/// - result >= 0
+/// - result <= balance
+#[cfg(any(test, feature = "fuzz"))]
+pub fn fuzz_accrued_capped(rate_per_sec: i128, elapsed: i128, balance: i128) -> i128 {
+    if rate_per_sec <= 0 || elapsed <= 0 || balance <= 0 {
+        return 0;
+    }
+    rate_per_sec.saturating_mul(elapsed).min(balance)
+}
+
+/// Compute the available (uncommitted) stream balance for a funder.
+///
+/// Mirrors `available_stream_balance`:
+///   `funded.saturating_sub(committed).max(0)`
+///
+/// Invariants verified by the fuzzer:
+/// - result >= 0
+/// - result <= funded (when funded >= 0)
+#[cfg(any(test, feature = "fuzz"))]
+pub fn fuzz_available_balance(funded: i128, committed: i128) -> i128 {
+    funded.saturating_sub(committed).max(0)
+}
+
 #[cfg(test)]
 mod test {
     extern crate std;
